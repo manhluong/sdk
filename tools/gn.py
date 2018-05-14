@@ -149,6 +149,16 @@ def DontUseClang(args, target_os, host_cpu, target_cpu):
   # We don't have clang on Windows.
   return target_os == 'win'
 
+def SetIsClang(args, gn_args):
+  dont_use_clang = DontUseClang(args, gn_args['target_os'],
+                                      gn_args['host_cpu'],
+                                      gn_args['target_cpu'])
+  gn_args['is_clang'] = args.clang and not dont_use_clang
+  if 'toolchain_prefix' in gn_args:
+     gn_args['is_clang'] = not gn_args['toolchain_prefix']
+  gn_args['is_asan'] = args.asan and gn_args['is_clang']
+  gn_args['is_msan'] = args.msan and gn_args['is_clang']
+  gn_args['is_tsan'] = args.tsan and gn_args['is_clang']
 
 def UseSysroot(args, gn_args):
   # Don't try to use a Linux sysroot if we aren't on Linux.
@@ -156,6 +166,10 @@ def UseSysroot(args, gn_args):
     return False
   # Don't use the sysroot if we're given another sysroot.
   if TargetSysroot(args):
+    return False
+  # Don't use the sysroot if crossbuild.
+  crossbuild = gn_args['target_cpu'] != gn_args['host_cpu']
+  if crossbuild:
     return False
   # Otherwise use the sysroot.
   return True
@@ -219,16 +233,7 @@ def ToGnArgs(args, mode, arch, target_os):
   if mode == 'product':
     gn_args['dart_runtime_mode'] = 'release'
   else:
-    gn_args['dart_runtime_mode'] = 'develop'
-
-  dont_use_clang = DontUseClang(args, gn_args['target_os'],
-                                      gn_args['host_cpu'],
-                                      gn_args['target_cpu'])
-  gn_args['is_clang'] = args.clang and not dont_use_clang
-
-  gn_args['is_asan'] = args.asan and gn_args['is_clang']
-  gn_args['is_msan'] = args.msan and gn_args['is_clang']
-  gn_args['is_tsan'] = args.tsan and gn_args['is_clang']
+    gn_args['dart_runtime_mode'] = 'develop' 
 
   if not args.platform_sdk and not gn_args['target_cpu'].startswith('arm'):
     gn_args['dart_platform_sdk'] = args.platform_sdk
@@ -245,6 +250,8 @@ def ToGnArgs(args, mode, arch, target_os):
     toolchain = ToolchainPrefix(args)
     if toolchain:
       gn_args['toolchain_prefix'] = ParseStringMap(arch, toolchain)
+  
+  SetIsClang(args, gn_args)
 
   goma_dir = os.environ.get('GOMA_DIR')
   goma_home_dir = os.path.join(os.getenv('HOME', ''), 'goma')
