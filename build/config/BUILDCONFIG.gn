@@ -130,6 +130,9 @@ declare_args() {
 
   # Compile for Thread Sanitizer to find threading bugs.
   is_tsan = false
+
+  # Use -std=gnu++XX instead of -std=c++XX
+  use_stdgnu = false
 }
 
 # =============================================================================
